@@ -3,6 +3,7 @@ package metrics
 import (
 	"fmt"
 	"github.com/protolambda/rumor/metrics/utils"
+	"github.com/protolambda/zrnt/eth2/beacon"
 	"strconv"
 )
 
@@ -41,6 +42,9 @@ type Peer struct {
 	ConnFlag          bool  // Flag that points if the peer was connected (for re-loading purposes)
 	LastExport        int64 //(timestamp in seconds of the last exported time (backup for when we are loading the Peer)
 
+	// BeaconStatus
+	BeaconStatus beacon.Status
+
 	// Counters for the different topics
 	BeaconBlock          MessageMetrics
 	BeaconAggregateProof MessageMetrics
@@ -71,6 +75,8 @@ func NewPeer(peerId string) Peer {
 
 		MetadataRequest: false,
 		MetadataSucceed: false,
+
+		BeaconStatus: beacon.Status{}, 
 
 		ConnectionEvents:  make([]ConnectionEvents, 0),
 		TotConnections:    0,
@@ -107,6 +113,15 @@ func (pm *Peer) GetAllMessagesCount() uint64 {
 		pm.VoluntaryExit.Cnt +
 		pm.AttesterSlashing.Cnt +
 		pm.ProposerSlashing.Cnt)
+}
+
+// Update beacon Status of the peer
+func (pm *Peer) UpdateBeaconStatus(bStatus beacon.Status) {
+	pm.BeaconStatus.ForkDigest = bStatus.ForkDigest
+	pm.BeaconStatus.FinalizedRoot = bStatus.FinalizedRoot
+	pm.BeaconStatus.FinalizedEpoch = bStatus.FinalizedEpoch
+	pm.BeaconStatus.HeadRoot = bStatus.HeadRoot
+	pm.BeaconStatus.HeadSlot = bStatus.HeadSlot
 }
 
 // TODO: quick copy paste

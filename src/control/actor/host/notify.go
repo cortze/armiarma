@@ -7,12 +7,14 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/protolambda/rumor/metrics/utils"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/control/actor/peer/metadata"
 	"github.com/protolambda/rumor/metrics"
+	"github.com/protolambda/rumor/metrics/nodemetadata"
+	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/track"
+	"github.com/protolambda/zrnt/eth2/beacon"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
@@ -31,14 +33,12 @@ func (c *HostNotifyCmd) Help() string {
 func (c *HostNotifyCmd) HelpLong() string {
 	return `
 Args: <event-types>...
-
 Network event notifications.
 Valid event types:
  - listen (listen_open listen_close)
  - connection (connection_open connection_close)
  - stream (stream_open stream_close)
  - all
-
 Notification logs will have keys: "event" - one of the above detailed event types, e.g. listen_close.
 - "peer": peer ID
 - "direction": "inbound"/"outbound"/"unknown", for connections and streams
@@ -60,14 +60,28 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 
 	// request metadata as soon as we connect to a peer
 	peerData, err := PollPeerMetadata(conn.RemotePeer(), c.Base, c.PeerMetadataState, c.Store, c.PeerStore)
+	// request BeaconStatus metadata as we connect to a peer
+	h, err := c.Host()
+	if err != nil {
+		log.Error(err)
+	}
+	bState, err2 := nodemetadata.ReqBeaconStatus(context.Background(), h, conn.RemotePeer())
+	if err2 != nil {
+		log.Warn(err)
+	}
+	logrus.Info(&bState)
 	var peer metrics.Peer
+	// TODO: so far, If we didn't manage to exchange metadata, we asume that the peer didn't exchange Status neither
+	// 		  IMPORTANT: Metadata doen't include any kind of info related to the Host/Node
+	// 				     It just includes SeqNumber, Attnets
 	if err == nil {
-		peer = fetchPeerExtraInfo(peerData)
-		_ = peer
+		peer = fetchPeerExtraInfo(peerData, bState)	
+		// temp
+		log.Info(peer)
 	} else {
 		log.Info("could not get metadata for peer: ", conn.RemotePeer().String(), " err: ", err)
 		// TODO: Add also IP taken from ENR of discovered peers
-		peer = metrics.Peer {
+		peer = metrics.Peer{
 			PeerId: conn.RemotePeer().String(),
 		}
 	}
@@ -174,29 +188,30 @@ func fmtDirection(d network.Direction) string {
 
 // Convert from rumor PeerAllData to our Peer. Note that
 // some external data is fetched and some fields are parsed
-func fetchPeerExtraInfo(peerData *track.PeerAllData) metrics.Peer {
+func fetchPeerExtraInfo(peerData *track.PeerAllData, bStatus beacon.Status) metrics.Peer {
 	client, version := utils.FilterClientType(peerData.UserAgent)
+	// TODO: temporary fix untill IP clear IP is adjusted to database
+	// 		 GetIpAndLocationFromAddrs should be deprecated to GetLocationFromIP
 	address := utils.GetFullAddress(peerData.Addrs)
-
 	ip, country, city, err := utils.GetIpAndLocationFromAddrs(address)
 	if err != nil {
 		log.Error("error when fetching country/city from ip", err)
 	}
 
-	peer := metrics.Peer {
-		PeerId: peerData.PeerID.String(),
-		NodeId: peerData.NodeID.String(),
-		UserAgent: peerData.UserAgent,
-		ClientName: client,
+	peer := metrics.Peer{
+		PeerId:        peerData.PeerID.String(),
+		NodeId:        peerData.NodeID.String(),
+		UserAgent:     peerData.UserAgent,
+		ClientName:    client,
 		ClientVersion: version,
-		ClientOS: "TODO",
-		Pubkey: peerData.Pubkey,
-		Addrs: address,
-		Ip: ip,
-		Country: country,
-		City: city,
-		Latency: float64(peerData.Latency/time.Millisecond) / 1000,
+		ClientOS:      "TODO",
+		Pubkey:        peerData.Pubkey,
+		Addrs:         address,
+		Ip:            ip,
+		Country:       country,
+		City:          city,
+		Latency:       float64(peerData.Latency/time.Millisecond) / 1000,
 	}
-
+	peer.UpdateBeaconStatus(bStatus)
 	return peer
 }
