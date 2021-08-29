@@ -12,7 +12,6 @@ import (
 	"github.com/protolambda/rumor/control/actor/base"
 	"github.com/protolambda/rumor/control/actor/peer/metadata"
 	"github.com/protolambda/rumor/metrics"
-	"github.com/protolambda/rumor/metrics/nodemetadata"
 	"github.com/protolambda/rumor/metrics/utils"
 	"github.com/protolambda/rumor/p2p/track"
 	"github.com/protolambda/zrnt/eth2/beacon"
@@ -58,24 +57,16 @@ func (c *HostNotifyCmd) listenCloseF(net network.Network, addr ma.Multiaddr) {
 
 func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	logrus.Info("connection detected: ", conn.RemotePeer().String())
-	h, err := c.Host()
-	if err != nil {
-		log.Warn(err)
-	}
+	h, _ := c.Host()
 	// Request the Host Metadata
-	hInfo, err := nodemetadata.ReqHostInfo(context.Background(), h, conn)
-	if err != nil {
-		log.Error(err)
-	}
+	hInfo := ReqHostInfo(context.Background(), h, conn)
 	// Request the BeaconMetadata
-	bMetadata, err := nodemetadata.ReqBeaconMetadata(context.Background(), h, conn.RemotePeer())
+	bMetadata, err := ReqBeaconMetadata(context.Background(), h, conn.RemotePeer())
 	if err != nil {
 		log.Warn(err)
 	}
-	log.Info(bMetadata)
 	// request BeaconStatus metadata as we connect to a peer
-	bStatus, err := nodemetadata.ReqBeaconStatus(context.Background(), h, conn.RemotePeer())
-	log.Info(bStatus)
+	bStatus, err := ReqBeaconStatus(context.Background(), h, conn.RemotePeer())
 	if err != nil {
 		log.Warn(err)
 	}	
@@ -86,7 +77,6 @@ func (c *HostNotifyCmd) connectedF(net network.Network, conn network.Conn) {
 	// fetch all the info gathered from the peer into a new Peer struct 
 	peer = fetchPeerInfo(bStatus, bMetadata, hInfo, n)
 	log.Info("fetching info")
-	log.Info(peer)
 	// So far, just act like if we got new info, Update or Aggregate new info from a peer already on the Peerstore
 	c.PeerStore.AddPeer(peer)
 	c.PeerStore.AddConnectionEvent(conn.RemotePeer().String(), "Connection")
@@ -193,7 +183,7 @@ func fmtDirection(d network.Direction) string {
 // Fetch all the different metadata we received to save it into a new peer struct
 // TODO: Still few things to consider with new approach, like version handling
 // 		 or fetching the actual info with previous info from the peer
-func fetchPeerInfo(bStatus beacon.Status, bMetadata beacon.MetaData, hInfo nodemetadata.BasicHostInfo, n *enode.Node) metrics.Peer {
+func fetchPeerInfo(bStatus beacon.Status, bMetadata beacon.MetaData, hInfo BasicHostInfo, n *enode.Node) metrics.Peer {
 	client, version := utils.FilterClientType(hInfo.UserAgent)
 	ip, err := utils.GetIPfromMultiaddress(hInfo.Addrs)
 	if err != nil {
