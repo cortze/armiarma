@@ -3,6 +3,9 @@ package utils
 import (
 	"strings"
 	"time"
+	"fmt"
+	"errors"
+	"net"
 )
 
 // Client utils
@@ -77,4 +80,39 @@ func GetTimeMiliseconds() int64 {
 	millis := nanos / 1000000
 
 	return millis
+}
+
+
+func GetIPfromMultiaddress(multiaddr string) (ip string, err error) {
+	s := strings.Split(multiaddr, "/")
+	if len(s) < 3 {
+		return ip, errors.New(fmt.Sprintf("Multiaddress doesn't include an IP: %s", multiaddr))
+	}
+	return s[2], nil
+}
+
+
+// IP public filtering 
+var PrivateIPNetworks = []net.IPNet{
+	net.IPNet{
+		IP:   net.ParseIP("10.0.0.0"),
+		Mask: net.CIDRMask(8, 32),
+	},
+	net.IPNet{
+		IP:   net.ParseIP("172.16.0.0"),
+		Mask: net.CIDRMask(12, 32),
+	},
+	net.IPNet{
+		IP:   net.ParseIP("192.168.0.0"),
+		Mask: net.CIDRMask(16, 32),
+	},
+}
+
+func IsPublic(ip net.IP) bool {
+	for _, ipNet := range PrivateIPNetworks {
+		if ipNet.Contains(ip) || ip.IsLoopback() || ip.IsUnspecified() {
+			return false
+		}
+	}
+	return true
 }

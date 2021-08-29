@@ -44,6 +44,7 @@ type Peer struct {
 
 	// BeaconStatus
 	BeaconStatus beacon.Status
+	BeaconMetadata beacon.MetaData
 
 	// Counters for the different topics
 	BeaconBlock          MessageMetrics
@@ -77,6 +78,7 @@ func NewPeer(peerId string) Peer {
 		MetadataSucceed: false,
 
 		BeaconStatus: beacon.Status{}, 
+		BeaconMetadata: beacon.MetaData{},
 
 		ConnectionEvents:  make([]ConnectionEvents, 0),
 		TotConnections:    0,
@@ -122,6 +124,12 @@ func (pm *Peer) UpdateBeaconStatus(bStatus beacon.Status) {
 	pm.BeaconStatus.FinalizedEpoch = bStatus.FinalizedEpoch
 	pm.BeaconStatus.HeadRoot = bStatus.HeadRoot
 	pm.BeaconStatus.HeadSlot = bStatus.HeadSlot
+}
+
+// Update beacon Metadata of the peer
+func (pm *Peer) UpdateBeaconMetadata(bMetadata beacon.MetaData) {
+	pm.BeaconMetadata.SeqNumber = bMetadata.SeqNumber
+	pm.BeaconMetadata.Attnets = bMetadata.Attnets
 }
 
 // TODO: quick copy paste
