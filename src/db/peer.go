@@ -152,6 +152,10 @@ func (pm *Peer) FetchConnectionsFromNewPeer(newPeer Peer) {
 		pm.MetadataSucceed = newPeer.MetadataSucceed
 	}
 
+	if newPeer.Succeed {
+		pm.Succeed = newPeer.Succeed
+	}
+
 	pm.Attempts += newPeer.Attempts
 
 	// Check that we dont fetch old peer into old Peer
@@ -550,9 +554,17 @@ func (pm *Peer) ToCsvLine() string {
 		connStablished = "true"
 	}
 	// get the multiaddress of the peers
-	mAddrss := ""
-	if len(pm.MAddrs) != 0 {
-		mAddrss = pm.ExtractPublicAddr().String()
+	publicAddr := ""
+	if len(pm.MAddrs) > 0 {
+		mAddr := pm.ExtractPublicAddr()
+		if mAddr != nil { // public mAddr found
+			publicAddr = mAddr.String()
+		} else {
+			// no public mAddr found, return the first one
+
+			publicAddr = pm.MAddrs[0].String()
+			fmt.Println("........................\n\n", publicAddr)
+		}
 	}
 
 	node, err := pm.GetBlockchainNode()
@@ -579,7 +591,7 @@ func (pm *Peer) ToCsvLine() string {
 		pm.ClientName + "," +
 		pm.ClientVersion + "," +
 		pm.Pubkey + "," +
-		mAddrss + "," +
+		publicAddr + "," +
 		pm.Ip + "," +
 		pm.Country + "," +
 		pm.City + "," +
