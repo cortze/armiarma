@@ -561,9 +561,7 @@ func (pm *Peer) ToCsvLine() string {
 			publicAddr = mAddr.String()
 		} else {
 			// no public mAddr found, return the first one
-
 			publicAddr = pm.MAddrs[0].String()
-			fmt.Println("........................\n\n", publicAddr)
 		}
 	}
 
